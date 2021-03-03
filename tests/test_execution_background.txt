@@ -1,0 +1,5 @@
+#
+# test_pipe_execution_background.txt - Tester l'execution de processus en arriere plan avec gestion des zombie.
+#
+sleep 5 &
+ls

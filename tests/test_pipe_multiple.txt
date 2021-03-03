@@ -1,0 +1,4 @@
+#
+# test_pipe_multiple.txt - Tester la gestion d'un pipe a plus de deux commandes.
+#
+ls -l | grep s | wc -l 

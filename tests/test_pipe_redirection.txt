@@ -1,0 +1,5 @@
+#
+# test_pipe_redirection.txt - Tester la gestion d'un pipe avec des redirection de fichier.
+#
+ls -l > tests/files_test_redirection.txt
+cat < tests/files_test_redirection.txt | grep x | wc -l > tests/files_test_pipe_redirection.txt

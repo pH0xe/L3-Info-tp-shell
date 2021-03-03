@@ -1,0 +1,4 @@
+#
+# test_pipe_simple.txt - Tester la gestion d'un pipe a deux commandes.
+#
+ls -l | wc -l 

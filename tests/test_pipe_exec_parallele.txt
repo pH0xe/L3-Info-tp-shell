@@ -1,0 +1,4 @@
+#
+# test_pipe_exec_parallele.txt - Tester la gestion d'un pipe et de l'execution simultanée des commandes.
+#
+sleep 5 | ls 

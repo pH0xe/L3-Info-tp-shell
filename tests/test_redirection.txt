@@ -1,0 +1,7 @@
+#
+# test_redirection.txt - Tester la gestion des redirection in et out. 
+# Premiere commande redirection vers le fichier tests/files_redirection.txt
+# Seconde commande affiche le contenue de ce meme fichier avec un redirection.
+#
+ls -l > tests/files_test_redirection.txt
+cat < tests/files_test_redirection.txt
