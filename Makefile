@@ -16,7 +16,7 @@ INCLUDE = readcmd.h csapp.h
 OBJS = readcmd.o csapp.o
 INCLDIR = -I.
 
-all: shell shell_exemple
+all: shell
 
 %.o: %.c $(INCLUDE)
 	$(CC) $(CFLAGS) $(INCLDIR) -c -o $@ $<
