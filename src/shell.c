@@ -9,20 +9,35 @@
 
 #define PIPE_IN 1
 #define PIPE_OUT 0
+#define MAX_CMD 100
 
-int groupId;
+typedef struct t_process{
+	int pid;
+	char* cmdName;
+} process;
+
+
+int foregroundGroup;
+process* bgProcess;
 
 void setPrompt() {
 	printf("\r%s> ", getcwd(NULL, 0));
 }
 
-void handlerSigChild(int sig)
-{
+void handlerSigChild(int sig){
     pid_t pid;
     while ((pid = waitpid(-1, NULL, WNOHANG|WUNTRACED)) > 0) {
-		printf("\n[%d] done\n", pid);
+		int i = 0;
+		while (pid != bgProcess[i].pid){
+			i++;
+		}
+		
+		printf("\n[%d] done\t%s\n", pid, bgProcess[i].cmdName);
+		bgProcess[i].pid = 0;
+		free(bgProcess[i].cmdName);
+		bgProcess[i].cmdName = NULL;	
 	}
-	if (groupId == 0) {
+	if (foregroundGroup == 0) {
 		setPrompt();
 		fflush(stdout);
 	}
@@ -31,7 +46,15 @@ void handlerSigChild(int sig)
 }
 
 void handlerSigInt(int sig) {
-	
+	if (foregroundGroup != 0) {
+		Kill(-foregroundGroup, SIGINT);
+		foregroundGroup = 0;
+	} else {
+		printf("\n");
+	}
+	setPrompt();
+	fflush(stdout);
+    
     return;
 }
 
@@ -73,6 +96,7 @@ pid_t execCmd(char **cmd, char* out, char* in, int cmdNumber, int last, int** fd
 	} else {
 		pid_t pid = Fork();
 		if (pid == 0){ // Fils
+			foregroundGroup = 0;
 			if (last && cmdNumber == 0){
 				redirectInput(in);
 				redirectOutput(out);	
@@ -115,8 +139,56 @@ int isLast(char*** seq, int i) {
 	return (getCommandCount(seq) == i+1);
 }
 
+void attentePremierPlan() {
+	if (foregroundGroup != 0){
+		while (waitpid(-foregroundGroup, NULL, 0) > 0) {}
+		foregroundGroup = 0;
+	}
+}
+
+void ajoutBg(int pid, char* cmdName) {
+	int i = 0;
+	
+	while (i < MAX_CMD && bgProcess[i].pid != 0) {
+		i++;
+	}
+
+	if (i < MAX_CMD) {
+		bgProcess[i].pid = pid;
+		bgProcess[i].cmdName = Malloc(strlen(cmdName) +1);
+		strcpy(bgProcess[i].cmdName, cmdName);
+	} else {
+		app_error("Background error : nombre de commande en arrière plan trop important");
+	}	
+}
+
+void initBgProcess() {
+	bgProcess = Malloc(MAX_CMD * sizeof(process));	
+
+	for (size_t i = 0; i < MAX_CMD; i++) {
+		bgProcess[i].pid = 0;
+	}
+}
+
+int** initFd(int cmdCount) {
+	int** fd = Malloc(sizeof(int *) * cmdCount);
+
+	int i;
+	for(i = 0; i < cmdCount; i++) {
+		fd[i] = Malloc(sizeof(int) *2);
+		if (pipe(fd[i]) == -1){
+			unix_error("Pipe error : ");
+		}
+	}
+	return fd;
+}
+
+
 int main() {
 	Signal(SIGCHLD, handlerSigChild);
+	Signal(SIGINT, handlerSigInt);
+
+	initBgProcess();
 
 	while (1) {
 		struct cmdline *l;
@@ -138,18 +210,11 @@ int main() {
 			continue;
 		}
 
-		int cmdCount = getCommandCount(l->seq);
-		
-		fd = Malloc(sizeof(int *) * cmdCount);
 
-		for(i = 0; i < cmdCount; i++) {
-			fd[i] = Malloc(sizeof(int) *2);
-			if (pipe(fd[i]) == -1){
-				unix_error("Pipe error : ");
-			}
-		}
+		fd = initFd(getCommandCount(l->seq));
 
-		groupId = 0;
+		foregroundGroup = 0;
+		int group = 0;
 		for (i=0; l->seq[i]!=0; i++) {
 			char **cmd = l->seq[i];
 			
@@ -161,15 +226,17 @@ int main() {
 			
 			pid_t pid = execCmd(cmd, l->out, l->in, i, isLast(l->seq, i), fd);
 
+			Setpgid(pid, group);
+			group = getpgid(pid);
+
 			if (!l->bg) {
-				Setpgid(pid, groupId);
-				groupId = getpgid(pid);
+				foregroundGroup = group;
+			} else {
+				ajoutBg(pid, l->seq[i][0]);	
 			}
+			// printf("pid : %d, pgid : %d, shell pgid : %d, shell pid : %d\n", pid, getpgid(pid), getpgrp(), getpid());
 				
 		}
-		if (groupId != 0){
-			while (waitpid(-groupId, NULL, 0) > 0) {}
-			groupId = 0;
-		}
+		attentePremierPlan();
 	}
 }
